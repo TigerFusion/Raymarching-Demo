@@ -4,7 +4,7 @@
 
 var RESOLUTION = 1; // 0.5 is half the resolution
 
-function create()
+function init()
 {
 	// This makes the body the full size of the window
 	document.body.style.margin = "0px";
@@ -21,7 +21,7 @@ function create()
 	document.body.appendChild(canvas);
 	
 	let fpsNode = document.createElement("div");
-	fpsNode.style.backgroundColor = "rgba(100%, 100%, 100%, 0.5)";
+	fpsNode.style.backgroundColor = "rgba(50%, 50%, 50%, 0.5)";
 	fpsNode.style.margin = "0px 5px";
 	fpsNode.style.padding = "6px 5px";
 	fpsNode.style.borderRadius = "5px";
@@ -40,7 +40,7 @@ function create()
 	document.body.appendChild(fpsNode);
 	
 	let cpuNode = document.createElement("div");
-	cpuNode.style.backgroundColor = "rgba(100%, 100%, 100%, 0.5)";
+	cpuNode.style.backgroundColor = "rgba(50%, 50%, 50%, 0.5)";
 	cpuNode.style.margin = "0px 5px";
 	cpuNode.style.padding = "6px 5px";
 	cpuNode.style.borderRadius = "5px";
@@ -84,15 +84,8 @@ function Project(cpuNode, fpsNode, canvas)
 		return;
 	}
 
-	this.position = [0,0,-9];
-	this.rotation = [0,0,0];
-	this.velocity = [0,0,0];
-	this.angularVelocity = [0,0,0];
-	this.lightColor = [0.67, 0.87, 0.93, 1.0];
-	this.checkerboard = 0;
+	this.floorColor = 0;
 	this.shaderScene = 0;
-	this.roundBox = 0;
-
 	this.cpuNode = cpuNode;
 	this.fpsNode = fpsNode;
 	this.gl = gl;
@@ -100,31 +93,46 @@ function Project(cpuNode, fpsNode, canvas)
 	let self = this;
 	
 	document.addEventListener("keyup", function(event)
-	{
-		// Key Up alert (keep this)
-		//alert("event: " + event.key);
-		
+	{		
 		// 0 is x and 1 is y
-		switch (event.keyCode)
+		switch (event.key)
 		{
-			case 87: // w
-			case 38: // ArrowUp
-				self.checkerboard = !self.checkerboard;
-				gl.uniform1i(self.shaderProgram.u_checkerboardLoc, self.checkerboard);
+			case "w":
+			case "ArrowUp":
+				if (self.floorColor === 1)
+				{
+					self.floorColor = 0;
+				}
+				else
+				{
+					self.floorColor = 1;
+				}
+				
+				gl.uniform1i(self.shaderProgram.u_floorColorLoc, self.floorColor);
 			break;
 						
-			case 65: // a
-			case 37: // ArrowLeft
+			case "a":
+			case "ArrowLeft":
 				self.shaderScene--;
 				self.shaderScene = Math.max(self.shaderScene, 0);
+				
+				gl.uniform1i(self.shaderProgram.u_shaderSceneLoc, self.shaderScene);
 			break;
 			
-			case 68: // d
-			case 39: // ArrowRight
+			case "d":
+			case "ArrowRight":
 				self.shaderScene++;
 				self.shaderScene = Math.min(self.shaderScene, 9);
+				
+				gl.uniform1i(self.shaderProgram.u_shaderSceneLoc, self.shaderScene);
 			break;
 		}
+	}, false);
+	
+	// iMouse pixel coords. xy: move position, zw: click position
+	document.addEventListener("mousemove", function(event)
+	{		
+		gl.uniform2f(self.shaderProgram.u_mouseLoc, event.offsetX, (self.canvas.height - event.offsetY));
 	}, false);
 	
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -134,22 +142,20 @@ function Project(cpuNode, fpsNode, canvas)
 	gl.enable(gl.CULL_FACE);
 	gl.cullFace(gl.BACK);
 	
-	// uniforms
-	this.shaderProgram.u_aspectRatioLoc = gl.getUniformLocation(this.shaderProgram, "u_aspectRatio");
-	this.shaderProgram.u_lightPositionLoc = gl.getUniformLocation(this.shaderProgram, "u_lightPosition");
-	this.shaderProgram.u_lightColorLoc = gl.getUniformLocation(this.shaderProgram, "u_lightColor");
-	this.shaderProgram.u_positionLoc = gl.getUniformLocation(this.shaderProgram, "u_position");
-	this.shaderProgram.u_rotationLoc = gl.getUniformLocation(this.shaderProgram, "u_rotation");
-
+	// Uniforms
+	this.shaderProgram.u_resolutionLoc = gl.getUniformLocation(this.shaderProgram, "iResolution");
+	this.shaderProgram.u_mouseLoc = gl.getUniformLocation(this.shaderProgram, "iMouse");
+	this.shaderProgram.u_timeLoc = gl.getUniformLocation(this.shaderProgram, "iTime");
+	this.shaderProgram.u_timeDeltaLoc = gl.getUniformLocation(this.shaderProgram, "iTimeDelta");
+	
+	// Keyboard Events
+	this.shaderProgram.u_floorColorLoc = gl.getUniformLocation(this.shaderProgram, "u_floorColor");
 	this.shaderProgram.u_shaderSceneLoc = gl.getUniformLocation(this.shaderProgram, "u_shaderScene");
-	this.shaderProgram.u_checkerboardLoc = gl.getUniformLocation(this.shaderProgram, "u_checkerboard");
-	this.shaderProgram.u_roundBoxLoc = gl.getUniformLocation(this.shaderProgram, "u_roundBox");
-
+	
 	// Attributes
-	this.shaderProgram.a_position = gl.getAttribLocation(this.shaderProgram, "a_position");
-
+	this.shaderProgram.a_verticesLoc = gl.getAttribLocation(this.shaderProgram, "a_vertices");
+		
 	gl.useProgram(this.shaderProgram);
-	gl.enableVertexAttribArray(this.shaderProgram.a_position);
 	
 	this.verticesArray =
 	[
@@ -173,6 +179,19 @@ function Project(cpuNode, fpsNode, canvas)
 	
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indicesArray), gl.STATIC_DRAW);
+
+	// Create the VAO
+	this.vao = gl.createVertexArray();
+	gl.bindVertexArray(this.vao);
+	
+	gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+
+	gl.enableVertexAttribArray(this.shaderProgram.a_verticesLoc);
+	gl.vertexAttribPointer(this.shaderProgram.a_verticesLoc, 2, gl.FLOAT, false, 0, 0);
+	
+	// Clear VAO
+	gl.bindVertexArray(null);
 	
 	// Frames per second
 	this.frameLoop =
@@ -192,10 +211,14 @@ function Project(cpuNode, fpsNode, canvas)
 		// event.preventDefault(); prevents a system beep from older browsers
 		self.canvas.width = window.innerWidth * RESOLUTION;
 		self.canvas.height = window.innerHeight * RESOLUTION;
+		
+		gl.viewport(0, 0, self.canvas.width, self.canvas.height);
 	}, false);
 
 	this.canvas.width = window.innerWidth * RESOLUTION;
 	this.canvas.height = window.innerHeight * RESOLUTION;
+	
+	gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 }
 
 Project.prototype.update = function()
@@ -203,6 +226,7 @@ Project.prototype.update = function()
 	let frameLoop = this.frameLoop;
 	let gl = this.gl;
 	let self = this;
+	let time = 0;
 	
 	var updateAnimation = function()
 	{
@@ -235,42 +259,19 @@ Project.prototype.update = function()
 			frameLoop.averageTime++;
 		}
 		
-		self.position[0] += (frameLoop.timeStep * self.velocity[0]);
-		self.position[1] += (frameLoop.timeStep * self.velocity[1]);
-		self.position[2] += (frameLoop.timeStep * self.velocity[2]);
-		self.rotation[0] += (frameLoop.timeStep * self.angularVelocity[0]);
-		self.rotation[1] += (frameLoop.timeStep * 1.0);
-		self.rotation[2] += (frameLoop.timeStep * self.angularVelocity[2]);
-		self.roundBox += (frameLoop.timeStep * 1.0);
-		
-		let matrix = mat4AxisAngle(mat4Identity(), [-1.0, 0.0, 0.0], self.rotation[0]);
-		matrix = mat4AxisAngle(matrix, [0.0,-1.0, 0.0], self.rotation[1]);
-		matrix = mat4AxisAngle(matrix, [0.0, 0.0,-1.0], self.rotation[2]);
-		matrix = mat4Translation(matrix, [1, 5,-6]);
-		self.lightPosition = vec3TranslationMat4(matrix);
-		
-		gl.uniform1f(self.shaderProgram.u_aspectRatioLoc, self.canvas.width / self.canvas.height);
-		gl.viewport(0, 0, self.canvas.width, self.canvas.height);
+		gl.uniform2f(self.shaderProgram.u_resolutionLoc, self.canvas.width, self.canvas.height);
+
+		time += frameLoop.timeStep;
+		gl.uniform1f(self.shaderProgram.u_timeLoc, time);
+		gl.uniform1f(self.shaderProgram.u_timeDeltaLoc, frameLoop.timeStep);
 		
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
 		gl.clear(gl.COLOR_BUFFER_BIT);
-		
-		gl.uniform1i(self.shaderProgram.u_shaderSceneLoc, self.shaderScene);
-		gl.uniform1i(self.shaderProgram.u_checkerboardLoc, self.checkerboard);
-		
-		gl.uniform1f(self.shaderProgram.u_roundBoxLoc, (Math.sin(self.roundBox) + 1.0) / 2.0);
-		gl.uniform4f(self.shaderProgram.u_lightColorLoc, self.lightColor[0], self.lightColor[1], self.lightColor[2], self.lightColor[3]);
-		gl.uniform3f(self.shaderProgram.u_lightPositionLoc, self.lightPosition[0], self.lightPosition[1], self.lightPosition[2]);
-		
-		gl.uniform3f(self.shaderProgram.u_positionLoc, self.position[0], self.position[1], self.position[2]);
-		gl.uniform3f(self.shaderProgram.u_rotationLoc, self.rotation[0], self.rotation[1], self.rotation[2]);
-		
-		gl.bindBuffer(gl.ARRAY_BUFFER, self.vertexBuffer);
-		gl.vertexAttribPointer(self.shaderProgram.a_position, 2, gl.FLOAT, false, 0, 0);
-		
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.indexBuffer);
+
+		gl.bindVertexArray(self.vao);
 		gl.drawElements(gl.TRIANGLES, self.indicesArray.length, gl.UNSIGNED_SHORT, 0);
-	
+		gl.bindVertexArray(null);
+		
 		window.requestAnimationFrame(updateAnimation);
 	}
 
