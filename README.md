@@ -1,6 +1,6 @@
 # Raymarching-Demo v1.1 (Build 5)
 
-This is a project I originaly worked on in Objective-C and OpenGL and then greatly improved and converted to JavaScript and WebGL.
+This is a project I originaly worked on in Objective-C and OpenGL, then greatly improved, and converted to JavaScript and WebGL.
 <br>
 <br><b>Keyboard Commands</b>
 <br>Use the left and right arrow keys to move between demos.
