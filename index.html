@@ -29,7 +29,7 @@ uniform int u_shaderScene; // The left arrow and right arrow keys
 out vec4 mainFragColor;
 // ************************** Do Not Remove **************************
 
-const int MAX_MARCHING_STEPS = 127;
+const int MAX_MARCHING_STEPS = 128;
 const float MIN_DISTANCE = 0.0;
 const float MAX_DISTANCE = 20.0;
 const float MIN_FOG = 0.0;
@@ -42,7 +42,7 @@ struct Material
 	vec3 ambientColor; // float(k_a) * vec3(i_a)
 	vec3 diffuseColor; // float(k_d) * vec3(i_d)
 	vec3 specularColor; // float(k_s) * vec3(i_s)
-	float shine;
+	float shininess;
 };
 
 struct Surface
@@ -56,18 +56,18 @@ Material blueLight(vec3 ambientColor)
 {	
 	vec3 diffuseColor = vec3(0.6, 0.8, 1.9);
 	vec3 specularColor = vec3(1, 1, 1);
-	float shine = 20.0;
+	float shininess = 30.0;
 	
-	return Material(ambientColor, diffuseColor, specularColor, shine);
+	return Material(ambientColor, diffuseColor, specularColor, shininess);
 }
 
 Material redLight(vec3 ambientColor)
 {
 	vec3 diffuseColor = vec3(2.0, 0.5, 0.5);
 	vec3 specularColor = vec3(1, 1, 1);
-	float shine = 5.0;
+	float shininess = 5.0;
 	
-	return Material(ambientColor, diffuseColor, specularColor, shine);
+	return Material(ambientColor, diffuseColor, specularColor, shininess);
 }
 
 // MARK: Operators
@@ -192,8 +192,8 @@ Surface scene(vec3 p)
 	
 	if (u_shaderScene == 0)
 	{
-		Surface sphere1 = Surface(2, sdSphere(p - vec3(-2, 0, 0), 1.0), vec3(1.0, 0.5, 0.0));
-		Surface sphere2 = Surface(3, sdSphere(p - vec3(2, 0, 0), 1.0), vec3(0.7, 0.0, 0.7));
+		Surface sphere1 = Surface(2, sdSphere(p - vec3(-2, 0, 0), 1.0), vec3(0.4, 0.4, 1.0));
+		Surface sphere2 = Surface(3, sdSphere(p - vec3(2, 0, 0), 1.0), vec3(0.0, 1.0, 0.0));
 		
 		Surface shape = opUnion(sphere1, sphere2);
 		return opUnion(shape, floor);
@@ -336,22 +336,22 @@ float createShadow(vec3 ro, vec3 rd, float mint, float maxt, float k)
 
 // Phong lighting
 vec3 createLight(vec3 lightDir, vec3 normal, vec3 rd, Material mat)
-{	
-	// Diffuse
-	float dotLN = clamp(dot(lightDir, normal), 0.0, 1.0);
-	vec3 diffuse = mat.diffuseColor * dotLN;
+{
+    // diffuse
+    float diff = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = diff * mat.diffuseColor;
+    
+    // specular
+    if (mat.shininess > 0.0)
+    {
+		vec3 reflectDir = reflect(lightDir, normal);  
+		float spec = pow(max(dot(rd, reflectDir), 0.0), mat.shininess);
+		vec3 specular = 2.0 * spec * mat.specularColor;  
 	
-	// Specular
-	float dotRV = clamp(dot(reflect(lightDir, normal), rd), 0.0, 1.0);
-	
-	vec3 specular = vec3(0.0);
-	
-	if (mat.shine > 0.0)
-	{
-		specular = mat.specularColor * pow(dotRV, mat.shine);
+		return mat.ambientColor + diffuse + specular;
 	}
 	
-	return mat.ambientColor + diffuse + specular;
+    return mat.ambientColor + diffuse;
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
