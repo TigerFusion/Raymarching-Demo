@@ -1,4 +1,4 @@
-# Raymarching-Demo v1.1 (Build 5)
+# Raymarching-Demo v1.1 (Build 6)
 
 This is a project I originaly worked on in Objective-C and OpenGL, then greatly improved, and converted to JavaScript and WebGL.
 <br>
